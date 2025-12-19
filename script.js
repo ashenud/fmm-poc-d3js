@@ -6,9 +6,9 @@
     const config = {
         width: window.innerWidth,
         height: window.innerHeight,
-        nodeSize: d => [100, 60, 35, 28][Math.min(d.depth, 3)], // Size by depth
-        distance: d => [0, 280, 180, 120][Math.min(d.depth + 1, 3)], // Distance by depth
-        bubbleRadius: 15,
+        nodeSize: d => [80, 50, 30, 24][Math.min(d.depth, 3)], // Size by depth (reduced)
+        distance: d => [0, 220, 140, 100][Math.min(d.depth + 1, 3)], // Distance by depth (reduced)
+        bubbleRadius: 13,
         colors: {
             gradients: ['#ff6b9d', '#a29bfe', '#ff9ff3', '#ffc8dd'], // Root, Category, Subcategory, Leaf
             bubble: '#74b9ff',
@@ -56,10 +56,10 @@
         const simulation = d3.forceSimulation(nodes)
             .force('link', d3.forceLink(links).id(d => d.id).distance(d => {
                 // Adjust distance based on link type
-                return d.type === 'primary' ? 280 : 100;
+                return d.type === 'primary' ? 220 : 80;
             }).strength(0.5))
-            .force('charge', d3.forceManyBody().strength(-60))
-            .force('collision', d3.forceCollide().radius(d => d.radius + 12))
+            .force('charge', d3.forceManyBody().strength(-50))
+            .force('collision', d3.forceCollide().radius(d => d.radius + 10))
             .alphaDecay(0.05)
             .on('tick', () => {
                 // Update parent positions during simulation
@@ -102,8 +102,8 @@
                 const siblings = node.parent.children;
                 const index = siblings.indexOf(node);
                 const angle = (index * 2 * Math.PI / siblings.length) - Math.PI / 2;
-                x = fx = Math.cos(angle) * 280;
-                y = fy = Math.sin(angle) * 280;
+                x = fx = Math.cos(angle) * 220;
+                y = fy = Math.sin(angle) * 220;
             } else {
                 // Deeper levels: positioned relative to parent
                 const siblings = node.parent.children;
@@ -112,7 +112,7 @@
                 const spread = Math.min(siblings.length / 8, 0.5);
                 const angleStep = (Math.PI * spread) / Math.max(siblings.length - 1, 1);
                 const angle = parentAngle - (Math.PI * spread / 2) + (index * angleStep);
-                const distance = depth === 2 ? 180 : 120; // Distance for level 2 and 3
+                const distance = depth === 2 ? 140 : 100; // Distance for level 2 and 3
                 x = (node.parent.x || 0) + Math.cos(angle) * distance;
                 y = (node.parent.y || 0) + Math.sin(angle) * distance;
             }
@@ -180,7 +180,7 @@
             .attr('text-anchor', 'middle')
             .attr('dy', d => d.depth === 0 ? '-10' : '0.35em')
             .attr('fill', '#fff')
-            .style('font-size', d => [20, 14, 11, 10][Math.min(d.depth, 3)] + 'px')
+            .style('font-size', d => [18, 13, 10, 9][Math.min(d.depth, 3)] + 'px')
             .style('font-weight', d => d.hasChildren ? 600 : 500)
             .style('pointer-events', 'none')
             .style('text-shadow', '0 1px 2px rgba(255, 255, 255, 0.8)')
@@ -190,15 +190,15 @@
         nodeGroups.filter(d => d.depth === 0)
             .append('text')
             .attr('text-anchor', 'middle')
-            .attr('dy', '15')
+            .attr('dy', '12')
             .attr('fill', '#fff')
-            .style('font-size', '14px')
+            .style('font-size', '12px')
             .style('pointer-events', 'none')
             .style('text-shadow', '0 1px 2px rgba(255, 255, 255, 0.8)')
             .text(d => d.name.split(' ').slice(1).join(' '));
 
-        // Count bubbles for leaf nodes (nodes without children)
-        drawCountBubbles(nodeGroups.filter(d => !d.hasChildren && d.value));
+        // Count bubbles will be drawn after simulation settles
+        // drawCountBubbles(nodeGroups.filter(d => !d.hasChildren && d.value));
     }
 
     function drawCountBubbles(leafNodes) {
@@ -210,7 +210,7 @@
             const angle = Math.atan2(dy, dx); // Angle from parent to node
 
             // Position bubble along the line extending away from parent
-            const offset = d.radius + 22;
+            const offset = d.radius + 18;
             const bubbleX = Math.cos(angle) * offset;
             const bubbleY = Math.sin(angle) * offset;
 
@@ -246,7 +246,7 @@
                 .attr('text-anchor', 'middle')
                 .attr('dy', '0.35em')
                 .attr('fill', '#fff')
-                .style('font-size', '11px')
+                .style('font-size', '10px')
                 .style('font-weight', 600)
                 .style('pointer-events', 'none')
                 .text(formatNumber(d.value));
@@ -296,7 +296,7 @@
             const angle = Math.atan2(dy, dx);
 
             // Position bubble along the line extending away from parent
-            const offset = d.radius + 22;
+            const offset = d.radius + 18;
             const bubbleX = Math.cos(angle) * offset;
             const bubbleY = Math.sin(angle) * offset;
 
@@ -304,21 +304,29 @@
             const nodeEdgeX = Math.cos(angle) * d.radius;
             const nodeEdgeY = Math.sin(angle) * d.radius;
 
-            // Connecting line
+            // Connecting line with animation
             node.append('line')
                 .attr('class', 'count-link')
                 .attr('x1', nodeEdgeX)
                 .attr('y1', nodeEdgeY)
-                .attr('x2', bubbleX)
-                .attr('y2', bubbleY)
+                .attr('x2', nodeEdgeX) // Start at node edge
+                .attr('y2', nodeEdgeY)
                 .attr('stroke', config.colors.bubble)
+                .attr('stroke-width', 0)
+                .attr('opacity', 0)
+                .transition()
+                .duration(500)
+                .delay((leafNodes.indexOf(d) * 30) + 100) // Slight delay after bubble starts
+                .attr('x2', bubbleX) // Grow to bubble position
+                .attr('y2', bubbleY)
                 .attr('stroke-width', 1.5)
                 .attr('opacity', 0.4);
 
-            // Bubble
+            // Bubble with scale animation
             const bubble = node.append('g')
                 .attr('class', 'count-bubble')
-                .attr('transform', `translate(${bubbleX},${bubbleY})`);
+                .attr('transform', `translate(${bubbleX},${bubbleY}) scale(0)`) // Start at scale 0
+                .style('opacity', 0);
 
             bubble.append('circle')
                 .attr('r', config.bubbleRadius)
@@ -330,10 +338,18 @@
                 .attr('text-anchor', 'middle')
                 .attr('dy', '0.35em')
                 .attr('fill', '#fff')
-                .style('font-size', '11px')
+                .style('font-size', '10px')
                 .style('font-weight', 600)
                 .style('pointer-events', 'none')
                 .text(formatNumber(d.value));
+
+            // Animate bubble growth with elastic easing
+            bubble.transition()
+                .duration(600)
+                .delay((leafNodes.indexOf(d) * 30)) // Stagger animation
+                .ease(d3.easeElasticOut.amplitude(1).period(0.4))
+                .attr('transform', `translate(${bubbleX},${bubbleY}) scale(1)`)
+                .style('opacity', 1);
         });
     }
 
@@ -395,17 +411,15 @@
     }
 
     function animateEntrance() {
-        g.selectAll('.node-circle, .count-bubble circle')
+        g.selectAll('.node-circle')
             .style('opacity', 0)
             .transition().duration(600).style('opacity', 1);
 
-        g.selectAll('text')
+        g.selectAll('.node-text')
             .style('opacity', 0)
             .transition().duration(500).delay(100).style('opacity', 1);
 
-        g.selectAll('.count-link')
-            .style('opacity', 0)
-            .transition().duration(500).delay(100).style('opacity', 0.4);
+        // Count bubbles and links are animated in redrawCountBubbles()
     }
 
     function formatNumber(num) {
