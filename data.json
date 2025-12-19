@@ -1,0 +1,110 @@
+{
+  "name": "15,875 Scholarships",
+  "value": 15875,
+  "children": [
+    {
+      "name": "Gender",
+      "children": [
+        { "name": "Female", "value": 12 },
+        { "name": "Male", "value": 43 },
+        { "name": "Non Binary", "value": 22 },
+        { "name": "Transgender", "value": 63 },
+        { "name": "Other", "value": 99 }
+      ]
+    },
+    {
+      "name": "Religion",
+      "children": [
+        { "name": "Christianity", "value": 43 },
+        { "name": "Islam", "value": 32 },
+        { "name": "Hinduism", "value": 12 },
+        { "name": "Buddhism", "value": 99 },
+        { "name": "Judaism", "value": 11 },
+        { "name": "Sikhism", "value": 11 },
+        { "name": "Folk Religions", "value": 11 },
+        { "name": "Atheism", "value": 11 }
+      ]
+    },
+    {
+      "name": "Military Association",
+      "children": [
+        {
+          "name": "Army",
+          "children": [
+            { "name": "Active Duty", "value": 15 },
+            { "name": "Reserve", "value": 10 },
+            { "name": "Veteran", "value": 7 }
+          ]
+        },
+        {
+          "name": "Navy",
+          "children": [
+            { "name": "Active Duty", "value": 12 },
+            { "name": "Reserve", "value": 8 },
+            { "name": "Veteran", "value": 12 }
+          ]
+        },
+        {
+          "name": "Air Force",
+          "children": [
+            { "name": "Active Duty", "value": 20 },
+            { "name": "Reserve", "value": 15 },
+            { "name": "Veteran", "value": 10 }
+          ]
+        },
+        {
+          "name": "Marine Corps",
+          "children": [
+            { "name": "Active Duty", "value": 30 },
+            { "name": "Reserve", "value": 22 },
+            { "name": "Veteran", "value": 15 }
+          ]
+        },
+        {
+          "name": "Coast Guard",
+          "children": [
+            { "name": "Active Duty", "value": 5 },
+            { "name": "Reserve", "value": 4 },
+            { "name": "Veteran", "value": 3 }
+          ]
+        },
+        {
+          "name": "Space Force",
+          "children": [
+            { "name": "Active Duty", "value": 50 },
+            { "name": "Reserve", "value": 30 },
+            { "name": "Veteran", "value": 12 }
+          ]
+        },
+        { "name": "National Guard", "value": 11 }
+      ]
+    },
+    {
+      "name": "GPA",
+      "children": [
+        { "name": "< 2.5", "value": 12 },
+        { "name": "< 3.0", "value": 59 },
+        { "name": "< 3.5", "value": 59 }
+      ]
+    },
+    {
+      "name": "Ethnicity",
+      "children": [
+        { "name": "White", "value": 12 },
+        { "name": "Black", "value": 32 },
+        { "name": "Hispanic", "value": 76 },
+        { "name": "Asian", "value": 67 },
+        { "name": "Native", "value": 45 },
+        { "name": "Pacific Islander", "value": 32 },
+        { "name": "Multiracial", "value": 45 }
+      ]
+    },
+    {
+      "name": "Wins",
+      "children": [
+        { "name": "Awarded", "value": 99 },
+        { "name": "Amount", "value": 100000 }
+      ]
+    }
+  ]
+}
