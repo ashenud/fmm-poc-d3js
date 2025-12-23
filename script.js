@@ -23,9 +23,26 @@
         .attr('height', config.height);
 
     const g = svg.append('g')
-        .attr('transform', `translate(${config.width / 2}, ${config.height / 2})`);
+        .attr('class', 'zoom-group');
 
     const tooltip = d3.select('#tooltip');
+
+    // Setup zoom behavior
+    const zoom = d3.zoom()
+        .scaleExtent([0.3, 3])  // Min zoom: 30%, Max zoom: 300%
+        .on('zoom', function (event) {
+            g.attr('transform', event.transform);
+        });
+
+    // Apply zoom to SVG
+    svg.call(zoom);
+
+    // Set initial zoom transform to center the visualization
+    const initialTransform = d3.zoomIdentity
+        .translate(config.width / 2, config.height / 2)
+        .scale(1);
+
+    svg.call(zoom.transform, initialTransform);
 
     // Create gradients dynamically
     const defs = svg.append('defs');
@@ -35,6 +52,9 @@
         gradient.append('stop').attr('offset', '100%')
             .attr('stop-color', d3.color(config.colors.gradients[i]).darker(0.5));
     });
+
+    // Global storage for all nodes (for path finding)
+    let allNodes = [];
 
     // Load and render
     d3.json('data.json').then(data => render(data));
@@ -46,6 +66,7 @@
 
         // Calculate positions
         const nodes = getPositions(root);
+        allNodes = nodes;  // Store globally for path finding
         const links = root.links().map(l => ({
             source: l.source.data.id,
             target: l.target.data.id,
@@ -136,7 +157,8 @@
                 hasChildren: hasChildren,
                 gradient: `url(#${['root', 'category', 'subcategory', 'leaf'][Math.min(depth, 3)]}Gradient)`,
                 parentX: node.parent ? (node.parent.x || 0) : null,
-                parentY: node.parent ? (node.parent.y || 0) : null
+                parentY: node.parent ? (node.parent.y || 0) : null,
+                parentId: node.parent ? node.parent.data.id : null  // Store parent ID for path finding
             });
         });
 
@@ -353,6 +375,50 @@
         });
     }
 
+    // Helper functions for tree path finding
+    function getAncestors(nodeId) {
+        const ancestors = [];
+        let currentNode = allNodes.find(n => n.id === nodeId);
+
+        while (currentNode && currentNode.parentId) {
+            currentNode = allNodes.find(n => n.id === currentNode.parentId);
+            if (currentNode) {
+                ancestors.push(currentNode.id);
+            }
+        }
+        return ancestors;
+    }
+
+    function getDescendants(nodeId) {
+        const descendants = [];
+        const node = allNodes.find(n => n.id === nodeId);
+        if (!node || !node.hasChildren) return descendants;
+
+        function traverse(currentId) {
+            const children = allNodes.filter(n => n.parentId === currentId);
+            children.forEach(child => {
+                descendants.push(child.id);
+                if (child.hasChildren) {
+                    traverse(child.id);
+                }
+            });
+        }
+
+        traverse(nodeId);
+        return descendants;
+    }
+
+    function getTreePath(nodeId) {
+        const ancestors = getAncestors(nodeId);
+        const descendants = getDescendants(nodeId);
+        return {
+            ancestors: ancestors,
+            descendants: descendants,
+            current: nodeId,
+            all: [...ancestors, nodeId, ...descendants]
+        };
+    }
+
     function handleHover(event, data, enter) {
         const node = d3.select(event.target.parentNode);
         node.raise();
@@ -393,6 +459,14 @@
             .attr('stroke-width', enter ? 2 : 1.5);
 
         if (enter) {
+            // Get tree path (ancestors + current + descendants)
+            const treePath = getTreePath(data.id);
+
+            // Get zoom transform to adjust tooltip position
+            const transform = d3.zoomTransform(svg.node());
+            const [x, y] = transform.apply([data.x, data.y]);
+            const screenPos = svg.node().getBoundingClientRect();
+
             tooltip
                 .html(`<div style="font-weight:600;font-size:16px;color:#6c5ce7;margin-bottom:4px">${data.name}</div>
                        ${data.value ? `<div style="font-size:14px;color:#666">Count: ${formatNumber(data.value)}</div>` : ''}`)
@@ -400,13 +474,55 @@
                 .style('left', (event.pageX + 15) + 'px')
                 .style('top', (event.pageY - 15) + 'px');
 
-            // Highlight connected links
-            g.selectAll('.link').style('opacity', l =>
-                (l.source.id === data.id || l.target.id === data.id) ? 0.8 : 0.1
-            );
+            // Highlight tree path nodes
+            g.selectAll('.node')
+                .transition().duration(200)
+                .style('opacity', d => treePath.all.includes(d.id) ? 1 : 0.2)
+                .select('.node-circle')
+                .style('filter', d => {
+                    if (d.id === data.id) {
+                        return 'drop-shadow(0 0 20px rgba(108,92,231,0.8))';
+                    } else if (treePath.all.includes(d.id)) {
+                        return 'drop-shadow(0 0 12px rgba(108,92,231,0.6))';
+                    }
+                    return d.depth === 0 ? 'drop-shadow(0 0 15px rgba(255,107,157,0.6))' :
+                        'drop-shadow(0 0 8px rgba(108,92,231,0.4))';
+                });
+
+            // Highlight tree path links
+            g.selectAll('.link')
+                .transition().duration(200)
+                .style('opacity', l => {
+                    const sourceId = l.source.id || l.source;
+                    const targetId = l.target.id || l.target;
+                    const sourceInPath = treePath.all.includes(sourceId);
+                    const targetInPath = treePath.all.includes(targetId);
+                    return (sourceInPath && targetInPath) ? 0.9 : 0.1;
+                })
+                .attr('stroke-width', l => {
+                    const sourceId = l.source.id || l.source;
+                    const targetId = l.target.id || l.target;
+                    const sourceInPath = treePath.all.includes(sourceId);
+                    const targetInPath = treePath.all.includes(targetId);
+                    return (sourceInPath && targetInPath) ? 3 : 1.5;
+                });
         } else {
             tooltip.classed('show', false);
-            g.selectAll('.link').style('opacity', 0.3);
+
+            // Reset all nodes
+            g.selectAll('.node')
+                .transition().duration(200)
+                .style('opacity', 1)
+                .select('.node-circle')
+                .style('filter', d => d.depth === 0 ?
+                    'drop-shadow(0 0 15px rgba(255,107,157,0.6))' :
+                    'drop-shadow(0 0 8px rgba(108,92,231,0.4))');
+
+            // Reset all links
+            g.selectAll('.link')
+                .transition().duration(200)
+                .style('opacity', 0.3)
+                .attr('stroke-width', d => d.type === 'primary' ? 2.5 : 1.5);
         }
     }
 
@@ -428,12 +544,38 @@
         return num.toString();
     }
 
+    // Double-click to reset zoom
+    svg.on('dblclick.zoom', function (event) {
+        event.preventDefault();
+        const resetTransform = d3.zoomIdentity
+            .translate(config.width / 2, config.height / 2)
+            .scale(1);
+        svg.transition()
+            .duration(750)
+            .call(zoom.transform, resetTransform);
+    });
+
+    // Prevent text selection during drag
+    svg.style('-webkit-user-select', 'none')
+        .style('-moz-user-select', 'none')
+        .style('-ms-user-select', 'none')
+        .style('user-select', 'none');
+
     // Responsive
     window.addEventListener('resize', () => {
+        const oldWidth = config.width;
+        const oldHeight = config.height;
         config.width = window.innerWidth;
         config.height = window.innerHeight;
         svg.attr('width', config.width).attr('height', config.height);
-        g.attr('transform', `translate(${config.width / 2}, ${config.height / 2})`);
-    });
 
+        // Adjust zoom transform to maintain view
+        const currentTransform = d3.zoomTransform(svg.node());
+        const newTransform = currentTransform
+            .translate(
+                (config.width - oldWidth) / 2,
+                (config.height - oldHeight) / 2
+            );
+        svg.call(zoom.transform, newTransform);
+    });
 })();
