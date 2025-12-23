@@ -55,6 +55,10 @@
 
     // Global storage for all nodes (for path finding)
     let allNodes = [];
+    let originalNodes = [];
+    let originalLinks = [];
+    let originalRoot = null;
+    let visibleCategories = new Set(); // Track which categories are visible
 
     // Load and render
     d3.json('data.json').then(data => render(data));
@@ -64,14 +68,25 @@
             .sum(d => d.value || 0)
             .sort((a, b) => b.value - a.value);
 
+        originalRoot = root; // Store original root
+
         // Calculate positions
         const nodes = getPositions(root);
         allNodes = nodes;  // Store globally for path finding
+        originalNodes = [...nodes]; // Store original nodes
+
         const links = root.links().map(l => ({
             source: l.source.data.id,
             target: l.target.data.id,
             type: l.target.depth === 1 ? 'primary' : 'secondary'
         }));
+        originalLinks = [...links]; // Store original links
+
+        // Build category filter UI
+        buildCategoryFilter(root);
+
+        // Apply initial filtering (all visible by default)
+        applyFilters();
 
         // Force simulation
         const simulation = d3.forceSimulation(nodes)
@@ -100,8 +115,225 @@
             redrawCountBubbles(nodes);
         }, 2000);
 
-        drawLinks(links);
-        drawNodes(nodes);
+        // Note: drawLinks and drawNodes are now called in applyFilters()
+    }
+
+    // Build category filter UI dynamically
+    function buildCategoryFilter(root) {
+        const filterPanel = d3.select('#category-filter');
+        filterPanel.html(''); // Clear existing
+
+        // Get first-level categories
+        const categories = root.children || [];
+
+        if (categories.length === 0) return;
+
+        // Create header
+        filterPanel.append('h3')
+            .text('Filter Categories');
+
+        // Create checkbox for each category
+        const filterContainer = filterPanel.append('div')
+            .attr('class', 'filter-container');
+
+        categories.forEach(category => {
+            const categoryName = category.data.name;
+            visibleCategories.add(categoryName); // All visible by default
+
+            const item = filterContainer.append('div')
+                .attr('class', 'category-filter-item')
+                .attr('data-category', categoryName);
+
+            item.append('input')
+                .attr('type', 'checkbox')
+                .attr('id', `filter-${categoryName}`)
+                .attr('checked', true)
+                .on('change', function () {
+                    const isChecked = this.checked;
+                    if (isChecked) {
+                        visibleCategories.add(categoryName);
+                        item.classed('hidden', false);
+                    } else {
+                        visibleCategories.delete(categoryName);
+                        item.classed('hidden', true);
+                    }
+                    applyFilters();
+                });
+
+            item.append('label')
+                .attr('for', `filter-${categoryName}`)
+                .text(categoryName);
+        });
+
+        // Add action buttons
+        const actions = filterPanel.append('div')
+            .attr('class', 'category-filter-actions');
+
+        actions.append('button')
+            .text('Show All')
+            .on('click', function () {
+                categories.forEach(cat => {
+                    visibleCategories.add(cat.data.name);
+                    d3.select(`#filter-${cat.data.name}`).property('checked', true);
+                    d3.select(`[data-category="${cat.data.name}"]`).classed('hidden', false);
+                });
+                applyFilters();
+            });
+
+        actions.append('button')
+            .text('Hide All')
+            .on('click', function () {
+                categories.forEach(cat => {
+                    visibleCategories.delete(cat.data.name);
+                    d3.select(`#filter-${cat.data.name}`).property('checked', false);
+                    d3.select(`[data-category="${cat.data.name}"]`).classed('hidden', true);
+                });
+                applyFilters();
+            });
+    }
+
+    // Get all descendant node IDs for a category
+    function getCategoryNodeIds(categoryName) {
+        const nodeIds = new Set();
+
+        // Find the category node
+        const categoryNode = originalNodes.find(n => n.name === categoryName && n.depth === 1);
+        if (!categoryNode) return nodeIds;
+
+        nodeIds.add(categoryNode.id);
+
+        // Recursively get all descendants
+        function getDescendants(nodeId) {
+            const children = originalNodes.filter(n => {
+                const parent = originalNodes.find(p => p.id === n.parentId);
+                return parent && parent.id === nodeId;
+            });
+
+            children.forEach(child => {
+                nodeIds.add(child.id);
+                getDescendants(child.id);
+            });
+        }
+
+        getDescendants(categoryNode.id);
+        return nodeIds;
+    }
+
+    // Apply filters to show/hide categories
+    function applyFilters() {
+        // Get all node IDs that should be hidden
+        const hiddenNodeIds = new Set();
+
+        originalNodes.forEach(node => {
+            if (node.depth === 1) {
+                // First-level category
+                if (!visibleCategories.has(node.name)) {
+                    hiddenNodeIds.add(node.id);
+                    // Add all descendants
+                    const descendants = getCategoryNodeIds(node.name);
+                    descendants.forEach(id => hiddenNodeIds.add(id));
+                }
+            }
+        });
+
+        // Filter nodes
+        const filteredNodes = originalNodes.filter(n => !hiddenNodeIds.has(n.id));
+
+        // Create node map for quick lookup
+        const nodeMap = new Map(filteredNodes.map(n => [n.id, n]));
+
+        // Filter and rebuild links with proper node references
+        const filteredLinks = originalLinks
+            .filter(l => {
+                const sourceId = typeof l.source === 'string' ? l.source : (l.source.id || l.source);
+                const targetId = typeof l.target === 'string' ? l.target : (l.target.id || l.target);
+                return !hiddenNodeIds.has(sourceId) && !hiddenNodeIds.has(targetId);
+            })
+            .map(l => {
+                const sourceId = typeof l.source === 'string' ? l.source : (l.source.id || l.source);
+                const targetId = typeof l.target === 'string' ? l.target : (l.target.id || l.target);
+                return {
+                    source: nodeMap.get(sourceId),
+                    target: nodeMap.get(targetId),
+                    type: l.type
+                };
+            })
+            .filter(l => l.source && l.target); // Remove invalid links
+
+        // Update allNodes for path finding
+        allNodes = filteredNodes;
+
+        // Smoothly fade out existing visualization
+        g.selectAll('.node, .link, .count-bubble, .count-link')
+            .transition()
+            .duration(300)
+            .style('opacity', 0)
+            .on('end', function () {
+                d3.select(this).remove();
+            });
+
+        // Wait for fade out, then redraw
+        setTimeout(() => {
+            // Clear any remaining elements
+            g.selectAll('.nodes').remove();
+            g.selectAll('.links').remove();
+            g.selectAll('.count-bubble').remove();
+            g.selectAll('.count-link').remove();
+
+            // Redraw with filtered data
+            drawLinks(filteredLinks);
+            drawNodes(filteredNodes);
+
+            // Re-run simulation with filtered nodes
+            const simulation = d3.forceSimulation(filteredNodes)
+                .force('link', d3.forceLink(filteredLinks).id(d => d.id).distance(d => {
+                    return d.type === 'primary' ? 220 : 80;
+                }).strength(0.5))
+                .force('charge', d3.forceManyBody().strength(-50))
+                .force('collision', d3.forceCollide().radius(d => d.radius + 10))
+                .alphaDecay(0.05)
+                .on('tick', () => {
+                    updateParentPositions(filteredNodes, filteredLinks);
+                    update(filteredNodes, filteredLinks);
+                })
+                .on('end', () => {
+                    simulation.stop();
+                    redrawCountBubbles(filteredNodes);
+                    animateEntrance();
+                });
+
+            setTimeout(() => {
+                simulation.stop();
+                redrawCountBubbles(filteredNodes);
+            }, 2000);
+        }, 350);
+
+        // Redraw with filtered data
+        drawLinks(filteredLinks);
+        drawNodes(filteredNodes);
+
+        // Re-run simulation with filtered nodes
+        const simulation = d3.forceSimulation(filteredNodes)
+            .force('link', d3.forceLink(filteredLinks).id(d => d.id).distance(d => {
+                return d.type === 'primary' ? 220 : 80;
+            }).strength(0.5))
+            .force('charge', d3.forceManyBody().strength(-50))
+            .force('collision', d3.forceCollide().radius(d => d.radius + 10))
+            .alphaDecay(0.05)
+            .on('tick', () => {
+                updateParentPositions(filteredNodes, filteredLinks);
+                update(filteredNodes, filteredLinks);
+            })
+            .on('end', () => {
+                simulation.stop();
+                redrawCountBubbles(filteredNodes);
+                animateEntrance();
+            });
+
+        setTimeout(() => {
+            simulation.stop();
+            redrawCountBubbles(filteredNodes);
+        }, 2000);
     }
 
     function getPositions(root) {

@@ -146,7 +146,6 @@ h1 {
 
 /* Zoom help text */
 .zoom-help {
-  display: none;
   position: absolute;
   bottom: 20px;
   right: 20px;
@@ -164,4 +163,88 @@ h1 {
 
 .zoom-help:hover {
   opacity: 1;
+}
+
+/* Category Filter Panel */
+.category-filter {
+  position: absolute;
+  top: 70px;
+  left: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 200;
+  min-width: 200px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.category-filter h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #6c5ce7;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.category-filter-item {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  cursor: pointer;
+  padding: 6px 8px;
+  border-radius: 6px;
+  transition: background 0.2s;
+}
+
+.category-filter-item:hover {
+  background: rgba(108, 92, 231, 0.1);
+}
+
+.category-filter-item input[type='checkbox'] {
+  margin-right: 8px;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: #6c5ce7;
+}
+
+.category-filter-item label {
+  cursor: pointer;
+  font-size: 13px;
+  color: #333;
+  flex: 1;
+  user-select: none;
+}
+
+.category-filter-item.hidden label {
+  opacity: 0.5;
+  text-decoration: line-through;
+}
+
+.category-filter-actions {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(108, 92, 231, 0.2);
+  display: flex;
+  gap: 8px;
+}
+
+.category-filter-actions button {
+  flex: 1;
+  padding: 6px 12px;
+  border: 1px solid #6c5ce7;
+  background: white;
+  color: #6c5ce7;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+
+.category-filter-actions button:hover {
+  background: #6c5ce7;
+  color: white;
 }
