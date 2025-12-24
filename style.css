@@ -248,3 +248,27 @@ h1 {
   background: #6c5ce7;
   color: white;
 }
+
+/* Level Filter Panel */
+.level-filter {
+  position: absolute;
+  top: 70px;
+  left: 240px; /* Position next to category filter */
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 200;
+  min-width: 200px;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.level-filter h3 {
+  margin: 0 0 12px 0;
+  font-size: 14px;
+  color: #6c5ce7;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

@@ -59,6 +59,7 @@
     let originalLinks = [];
     let originalRoot = null;
     let visibleCategories = new Set(); // Track which categories are visible
+    let visibleLevels = new Set(); // Track which depth levels are visible (0=root, 1=category, 2=subcategory, etc.)
 
     // Load and render
     d3.json('data.json').then(data => render(data));
@@ -84,6 +85,9 @@
 
         // Build category filter UI
         buildCategoryFilter(root);
+
+        // Build level filter UI
+        buildLevelFilter(root);
 
         // Apply initial filtering (all visible by default)
         applyFilters();
@@ -192,6 +196,86 @@
             });
     }
 
+    // Build level filter UI dynamically
+    function buildLevelFilter(root) {
+        const levelFilterPanel = d3.select('#level-filter');
+        levelFilterPanel.html(''); // Clear existing
+
+        // Find all depth levels in the data
+        const maxDepth = d3.max(originalNodes, d => d.depth) || 0;
+        const levelNames = ['Root', 'Categories', 'Subcategories', 'Sub-subcategories', 'Leaves'];
+
+        // Initialize all levels as visible
+        for (let i = 0; i <= maxDepth; i++) {
+            visibleLevels.add(i);
+        }
+
+        if (maxDepth === 0) return; // No levels to filter
+
+        // Create header
+        levelFilterPanel.append('h3')
+            .text('Filter Levels');
+
+        // Create checkbox for each level (skip root level 0)
+        const levelContainer = levelFilterPanel.append('div')
+            .attr('class', 'filter-container');
+
+        for (let depth = 1; depth <= maxDepth; depth++) {
+            const levelName = levelNames[depth] || `Level ${depth}`;
+            const levelId = `level-${depth}`;
+
+            const item = levelContainer.append('div')
+                .attr('class', 'category-filter-item')
+                .attr('data-level', depth);
+
+            item.append('input')
+                .attr('type', 'checkbox')
+                .attr('id', levelId)
+                .attr('checked', true)
+                .on('change', function () {
+                    const isChecked = this.checked;
+                    if (isChecked) {
+                        visibleLevels.add(depth);
+                        item.classed('hidden', false);
+                    } else {
+                        visibleLevels.delete(depth);
+                        item.classed('hidden', true);
+                    }
+                    applyFilters();
+                });
+
+            item.append('label')
+                .attr('for', levelId)
+                .text(levelName);
+        }
+
+        // Add action buttons
+        const actions = levelFilterPanel.append('div')
+            .attr('class', 'category-filter-actions');
+
+        actions.append('button')
+            .text('Show All')
+            .on('click', function () {
+                for (let depth = 1; depth <= maxDepth; depth++) {
+                    visibleLevels.add(depth);
+                    d3.select(`#level-${depth}`).property('checked', true);
+                    d3.select(`[data-level="${depth}"]`).classed('hidden', false);
+                }
+                applyFilters();
+            });
+
+        actions.append('button')
+            .text('Hide All')
+            .on('click', function () {
+                for (let depth = 1; depth <= maxDepth; depth++) {
+                    visibleLevels.delete(depth);
+                    d3.select(`#level-${depth}`).property('checked', false);
+                    d3.select(`[data-level="${depth}"]`).classed('hidden', true);
+                }
+                applyFilters();
+            });
+    }
+
     // Get all descendant node IDs for a category
     function getCategoryNodeIds(categoryName) {
         const nodeIds = new Set();
@@ -219,12 +303,42 @@
         return nodeIds;
     }
 
-    // Apply filters to show/hide categories
+    // Calculate aggregated value for a node (sum of all hidden descendant values)
+    function getAggregatedValue(nodeId, hiddenNodeIds) {
+        let total = 0;
+        const node = originalNodes.find(n => n.id === nodeId);
+        if (!node) return 0;
+
+        // Get all descendants
+        function sumDescendants(currentId) {
+            const children = originalNodes.filter(n => {
+                const parent = originalNodes.find(p => p.id === n.parentId);
+                return parent && parent.id === currentId;
+            });
+
+            children.forEach(child => {
+                if (hiddenNodeIds.has(child.id)) {
+                    // This descendant is hidden, add its value
+                    if (child.value) {
+                        total += child.value;
+                    }
+                    // Recursively sum its descendants
+                    sumDescendants(child.id);
+                }
+            });
+        }
+
+        sumDescendants(nodeId);
+        return total;
+    }
+
+    // Apply filters to show/hide categories and levels
     function applyFilters() {
         // Get all node IDs that should be hidden
         const hiddenNodeIds = new Set();
 
         originalNodes.forEach(node => {
+            // Filter by category
             if (node.depth === 1) {
                 // First-level category
                 if (!visibleCategories.has(node.name)) {
@@ -234,10 +348,41 @@
                     descendants.forEach(id => hiddenNodeIds.add(id));
                 }
             }
+
+            // Filter by level - hide nodes at hidden levels
+            if (!visibleLevels.has(node.depth)) {
+                hiddenNodeIds.add(node.id);
+                // Also hide all descendants of hidden level nodes
+                function hideDescendants(nodeId) {
+                    const children = originalNodes.filter(n => {
+                        const parent = originalNodes.find(p => p.id === n.parentId);
+                        return parent && parent.id === nodeId;
+                    });
+                    children.forEach(child => {
+                        hiddenNodeIds.add(child.id);
+                        hideDescendants(child.id);
+                    });
+                }
+                hideDescendants(node.id);
+            }
         });
 
         // Filter nodes
-        const filteredNodes = originalNodes.filter(n => !hiddenNodeIds.has(n.id));
+        let filteredNodes = originalNodes.filter(n => !hiddenNodeIds.has(n.id));
+
+        // Aggregate values for nodes whose children are hidden
+        filteredNodes = filteredNodes.map(node => {
+            const aggregatedValue = getAggregatedValue(node.id, hiddenNodeIds);
+            if (aggregatedValue > 0) {
+                // Create a copy with aggregated value
+                return {
+                    ...node,
+                    value: (node.value || 0) + aggregatedValue,
+                    hasAggregatedValue: true
+                };
+            }
+            return node;
+        });
 
         // Create node map for quick lookup
         const nodeMap = new Map(filteredNodes.map(n => [n.id, n]));
@@ -307,33 +452,6 @@
                 redrawCountBubbles(filteredNodes);
             }, 2000);
         }, 350);
-
-        // Redraw with filtered data
-        drawLinks(filteredLinks);
-        drawNodes(filteredNodes);
-
-        // Re-run simulation with filtered nodes
-        const simulation = d3.forceSimulation(filteredNodes)
-            .force('link', d3.forceLink(filteredLinks).id(d => d.id).distance(d => {
-                return d.type === 'primary' ? 220 : 80;
-            }).strength(0.5))
-            .force('charge', d3.forceManyBody().strength(-50))
-            .force('collision', d3.forceCollide().radius(d => d.radius + 10))
-            .alphaDecay(0.05)
-            .on('tick', () => {
-                updateParentPositions(filteredNodes, filteredLinks);
-                update(filteredNodes, filteredLinks);
-            })
-            .on('end', () => {
-                simulation.stop();
-                redrawCountBubbles(filteredNodes);
-                animateEntrance();
-            });
-
-        setTimeout(() => {
-            simulation.stop();
-            redrawCountBubbles(filteredNodes);
-        }, 2000);
     }
 
     function getPositions(root) {
@@ -537,8 +655,11 @@
         g.selectAll('.count-bubble').remove();
         g.selectAll('.count-link').remove();
 
-        // Get leaf nodes
-        const leafNodes = nodes.filter(d => !d.hasChildren && d.value);
+        // Get leaf nodes and nodes with aggregated values (whose children are hidden)
+        const leafNodes = nodes.filter(d => {
+            // Show bubble if: it's a leaf with value, OR it has aggregated value (hidden children)
+            return d.value && (!d.hasChildren || d.hasAggregatedValue);
+        });
 
         // Redraw with updated positions
         leafNodes.forEach(d => {
