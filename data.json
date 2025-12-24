@@ -9,6 +9,10 @@
         { "name": "Male", "value": 43 },
         { "name": "Non Binary", "value": 22 },
         { "name": "Transgender", "value": 63 },
+        { "name": "Other", "value": 99 },
+        { "name": "Male", "value": 43 },
+        { "name": "Non Binary", "value": 22 },
+        { "name": "Transgender", "value": 63 },
         { "name": "Other", "value": 99 }
       ]
     },
@@ -17,6 +21,12 @@
       "children": [
         { "name": "Christianity", "value": 43 },
         { "name": "Islam", "value": 32 },
+        { "name": "Hinduism", "value": 12 },
+        { "name": "Buddhism", "value": 99 },
+        { "name": "Judaism", "value": 11 },
+        { "name": "Sikhism", "value": 11 },
+        { "name": "Folk Religions", "value": 11 },
+        { "name": "Atheism", "value": 11 },
         { "name": "Hinduism", "value": 12 },
         { "name": "Buddhism", "value": 99 },
         { "name": "Judaism", "value": 11 },
@@ -33,6 +43,8 @@
           "children": [
             { "name": "Active Duty", "value": 15 },
             { "name": "Reserve", "value": 10 },
+            { "name": "Veteran", "value": 7 },
+            { "name": "Reserve", "value": 10 },
             { "name": "Veteran", "value": 7 }
           ]
         },
@@ -40,6 +52,8 @@
           "name": "Navy",
           "children": [
             { "name": "Active Duty", "value": 12 },
+            { "name": "Reserve", "value": 8 },
+            { "name": "Veteran", "value": 12 },
             { "name": "Reserve", "value": 8 },
             { "name": "Veteran", "value": 12 }
           ]
@@ -96,6 +110,12 @@
         { "name": "Asian", "value": 67 },
         { "name": "Native", "value": 45 },
         { "name": "Pacific Islander", "value": 32 },
+        { "name": "Multiracial", "value": 45 },
+        { "name": "Black", "value": 32 },
+        { "name": "Hispanic", "value": 76 },
+        { "name": "Asian", "value": 67 },
+        { "name": "Native", "value": 45 },
+        { "name": "Pacific Islander", "value": 32 },
         { "name": "Multiracial", "value": 45 }
       ]
     },
@@ -103,8 +123,11 @@
       "name": "Wins",
       "children": [
         { "name": "Awarded", "value": 99 },
+        { "name": "Amount", "value": 100000 },
+        { "name": "Amount", "value": 100000 },
         { "name": "Amount", "value": 100000 }
       ]
     }
   ]
 }
+
